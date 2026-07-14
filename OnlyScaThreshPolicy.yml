@@ -1,0 +1,41 @@
+resources:
+  repositories:
+  - repository: self
+    type: git
+    ref: master
+jobs:
+- job: Job_1
+  displayName: Agent job 1
+  pool:
+    name: Default
+  steps:
+  - checkout: self
+    clean: true
+  - task: Application security testing@2021
+    displayName: Cx
+    inputs:
+      projectName: sslTestVru
+      enableProxy: true
+      proxyUrl: http://localhost:8088
+      enableSastScan: false
+      CheckmarxService: ce842c6d-12a9-4b57-8626-796e17b31485
+      preset: All
+      fullTeamName: CxServer
+      sastCaChainFilePath: D:\cert\TrustedCer.cer
+      scanTimeout: 10
+      comment: test comment
+      vulnerabilityThreshold: true
+      high: 15
+      medium: 15
+      low: 15
+      enableDependencyScan: true
+      dependencyServerURL: 2bca0e76-55cc-4e5d-bfaf-bd7c0070b966
+      dependencyTenant: plugins
+      scaTeam: CxServer
+      scaCaChainFilePath: D:\cert\scap1.pem.cer
+      scaEnablePolicyViolations: true
+      scaVulnerabilityThreshold: true
+      scaHigh: 1
+      scaMedium: 2
+      scaLow: 3
+...
