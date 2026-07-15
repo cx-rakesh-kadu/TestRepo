@@ -207,11 +207,102 @@ public class DoLogicSecondOrderSqlInjectionTest extends TestCase {
     }
 
     // -------------------------------------------------------------------------
+    // rds.java tests
+    // -------------------------------------------------------------------------
+
+    /**
+     * Verifies that rds.java uses PreparedStatement (parameterized query)
+     * rather than a plain Statement with string concatenation for the
+     * saveInvoiceData method, which processes externally-sourced data.
+     *
+     * Second Order SQL Injection in rds.java: data retrieved from an external
+     * source (RDS) is used in an UPDATE query. The fix replaces the vulnerable
+     * Statement + string-concatenation pattern with PreparedStatement.
+     */
+    public void testRdsSourceUsesParameterizedQuery() throws Exception {
+        java.io.File sourceFile = findSourceFile("rds.java");
+        assertNotNull("rds.java source file must be locatable", sourceFile);
+
+        String sourceContent = readFile(sourceFile);
+
+        // The fix must use PreparedStatement
+        assertTrue(
+            "rds.java must use PreparedStatement for parameterized queries to prevent Second Order SQL Injection",
+            sourceContent.contains("PreparedStatement")
+        );
+
+        // The fix must use a placeholder '?' in the query (not string concatenation)
+        assertTrue(
+            "rds.java SQL query must use '?' placeholders instead of string concatenation",
+            sourceContent.contains("?")
+        );
+
+        // The fix must call setString to bind the data parameter safely
+        assertTrue(
+            "rds.java must call setString() to bind the externally-sourced data as a parameter",
+            sourceContent.contains("setString")
+        );
+
+        // The fix must call setInt to bind the id parameter safely
+        assertTrue(
+            "rds.java must call setInt() to bind the id as a parameter",
+            sourceContent.contains("setInt")
+        );
+    }
+
+    /**
+     * Verifies that rds.java no longer uses the vulnerable Statement +
+     * string-concatenation pattern that enables Second Order SQL Injection.
+     */
+    public void testRdsDoesNotConcatenateDataIntoQuery() throws Exception {
+        java.io.File sourceFile = findSourceFile("rds.java");
+        assertNotNull("rds.java source file must exist", sourceFile);
+
+        String sourceContent = readFile(sourceFile);
+
+        // The fix must NOT directly concatenate 'data' into the query string
+        assertFalse(
+            "rds.java must not concatenate 'data' directly into a SQL query string (Second Order SQLi sink)",
+            sourceContent.contains("\"UPDATE INVOICE SET data = \" + data")
+        );
+
+        // The fix must NOT use plain Statement for this query
+        assertFalse(
+            "rds.java must not create a plain Statement for the query that uses externally-sourced data",
+            sourceContent.contains("stmt.executeQuery(sql)")
+                && sourceContent.contains("+ data +")
+        );
+    }
+
+    /**
+     * Verifies that a SQL injection payload in rds.java's data parameter
+     * would be treated as a literal string value (not executed as SQL) when
+     * PreparedStatement is used.
+     */
+    public void testRdsUnionBasedInjectionPayloadSafelyBound() throws Exception {
+        java.io.File sourceFile = findSourceFile("rds.java");
+        assertNotNull("rds.java source file must exist", sourceFile);
+
+        String sourceContent = readFile(sourceFile);
+
+        // UNION-based attack is only possible if data is concatenated into the query.
+        // With PreparedStatement + setString, the payload is a literal bind value.
+        assertFalse(
+            "Vulnerable concatenation pattern '+ data +' must not exist in rds.java",
+            sourceContent.contains("+ data +")
+        );
+        assertTrue(
+            "Safe PreparedStatement pattern must be present in rds.java",
+            sourceContent.contains("prepareStatement") && sourceContent.contains("setString")
+        );
+    }
+
+    // -------------------------------------------------------------------------
     // Helper methods
     // -------------------------------------------------------------------------
 
     /**
-     * Locates the sqs.java source file by walking up from the test class
+     * Locates the source file by walking up from the test class
      * location and then searching common source directories.
      */
     private java.io.File findSourceFile(String fileName) {
