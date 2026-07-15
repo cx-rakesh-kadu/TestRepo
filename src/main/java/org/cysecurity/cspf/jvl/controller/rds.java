@@ -19,13 +19,18 @@ class Cl {
 		}
 		return null;
 	  }
-	  
-	String saveInvoiceData(string data, int id){
+
+	String saveInvoiceData(String data, int id){
 			try{
 				Connection con = getRemoteConnection();
-				Statement stmt = con.createStatement();
-				String sql = "UPDATE INVOICE SET data = " + data + " WHERE ID = " + id;
-				rs = stmt.executeQuery(sql);
+				// Use PreparedStatement to prevent Second Order SQL Injection:
+				// data originates from an external/previously-stored source and
+				// must be treated as untrusted input at the SQL boundary.
+				PreparedStatement pstmt = con.prepareStatement(
+					"UPDATE INVOICE SET data = ? WHERE ID = ?");
+				pstmt.setString(1, data);
+				pstmt.setInt(2, id);
+				ResultSet rs = pstmt.executeQuery();
 				return rs.getString("Id");
 			} catch (Exception exc){
 				//
