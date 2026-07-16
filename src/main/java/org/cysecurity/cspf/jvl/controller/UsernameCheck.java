@@ -9,8 +9,8 @@ package org.cysecurity.cspf.jvl.controller;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.Statement;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -48,8 +48,10 @@ public class UsernameCheck extends HttpServlet {
                 if(con!=null && !con.isClosed())
                 {
                     ResultSet rs=null;
-                    Statement stmt = con.createStatement();  
-                    rs=stmt.executeQuery("select * from users where username='"+user+"'");
+                    // Use PreparedStatement to prevent SQL Injection (CWE-89)
+                    PreparedStatement pstmt = con.prepareStatement("select * from users where username=?");
+                    pstmt.setString(1, user);
+                    rs=pstmt.executeQuery();
                     if (rs.next()) 
                     {  
                      json.put("available", "1"); 
