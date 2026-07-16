@@ -23,9 +23,11 @@ class Cl {
 	String saveInvoiceData(string data, int id){
 			try{
 				Connection con = getRemoteConnection();
-				Statement stmt = con.createStatement();
-				String sql = "UPDATE INVOICE SET data = " + data + " WHERE ID = " + id;
-				rs = stmt.executeQuery(sql);
+				// Use PreparedStatement to prevent SQL injection
+				PreparedStatement stmt = con.prepareStatement("UPDATE INVOICE SET data = ? WHERE ID = ?");
+				stmt.setString(1, data);
+				stmt.setInt(2, id);
+				ResultSet rs = stmt.executeQuery();
 				return rs.getString("Id");
 			} catch (Exception exc){
 				//

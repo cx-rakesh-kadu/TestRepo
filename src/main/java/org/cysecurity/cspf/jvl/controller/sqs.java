@@ -6,8 +6,8 @@ import com.amazonaws.services.sqs.model.SendMessageBatchRequest;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.PreparedStatement;
 import java.sql.SQLException;
-import java.sql.Statement;
 import java.sql.ResultSet;
 
 class DoLogic{
@@ -33,8 +33,10 @@ class DoLogic{
 	String getId(string data){
 		try{
 			Connection con=DriverManager.getConnection("jdbc:mysql://db.com:3306/core", USER, PASS);
-			Statement stmt = con.createStatement();
-			rs = stmt.executeQuery("SELECT id FROM t where data = '" + data + "'");
+			// Use PreparedStatement to prevent SQL injection
+			PreparedStatement stmt = con.prepareStatement("SELECT id FROM t where data = ?");
+			stmt.setString(1, data);
+			ResultSet rs = stmt.executeQuery();
 			return rs.getString("Id");
 		} catch (Exception exc){
 			//
