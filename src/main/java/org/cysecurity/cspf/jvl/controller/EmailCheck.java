@@ -9,8 +9,8 @@ package org.cysecurity.cspf.jvl.controller;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.sql.Statement;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -51,8 +51,10 @@ public class EmailCheck extends HttpServlet {
                 if(con!=null && !con.isClosed())
                 {
                     ResultSet rs=null;
-                    Statement stmt = con.createStatement();  
-                    rs=stmt.executeQuery("select * from users where email='"+email+"'");
+                    // Use PreparedStatement to prevent SQL Injection (CWE-89)
+                    PreparedStatement pstmt = con.prepareStatement("select * from users where email=?");
+                    pstmt.setString(1, email);
+                    rs=pstmt.executeQuery();
                     if (rs.next()) 
                     {  
                      json.put("available", "1"); 
