@@ -9,9 +9,9 @@ package org.cysecurity.cspf.jvl.controller;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -53,13 +53,23 @@ public class Register extends HttpServlet {
              {
                     if(con!=null && !con.isClosed())
                                {
-                                  
-                                   Statement stmt = con.createStatement();  
-                                  stmt.executeUpdate("INSERT into users(username, password, email, About,avatar,privilege,secretquestion,secret) values ('"+user+"','"+pass+"','"+email+"','"+about+"','default.jpg','user',1,'"+secret+"')");
-                                       stmt.executeUpdate("INSERT into UserMessages(recipient, sender, subject, msg) values ('"+user+"','admin','Hi','Hi<br/> This is admin of this page. <br/> Welcome to Our Forum')");
-             
+                                   // Use PreparedStatement to prevent SQL Injection (CWE-89)
+                                   PreparedStatement pstmt1 = con.prepareStatement(
+                                       "INSERT into users(username, password, email, About, avatar, privilege, secretquestion, secret) values (?,?,?,?,'default.jpg','user',1,?)");
+                                   pstmt1.setString(1, user);
+                                   pstmt1.setString(2, pass);
+                                   pstmt1.setString(3, email);
+                                   pstmt1.setString(4, about);
+                                   pstmt1.setString(5, secret);
+                                   pstmt1.executeUpdate();
+
+                                   PreparedStatement pstmt2 = con.prepareStatement(
+                                       "INSERT into UserMessages(recipient, sender, subject, msg) values (?,'admin','Hi','Hi<br/> This is admin of this page. <br/> Welcome to Our Forum')");
+                                   pstmt2.setString(1, user);
+                                   pstmt2.executeUpdate();
+
                                     response.sendRedirect("index.jsp");
-                                    
+
                                }
                     else
                     {
