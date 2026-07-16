@@ -298,8 +298,163 @@ public class DoLogicSecondOrderSqlInjectionTest extends TestCase {
     }
 
     // -------------------------------------------------------------------------
+    // Messages.jsp tests — Second Order SQL Injection via session attribute
+    // -------------------------------------------------------------------------
+
+    /**
+     * Verifies that Messages.jsp imports PreparedStatement rather than the
+     * vulnerable plain Statement class.
+     *
+     * Second Order SQL Injection in Messages.jsp:
+     *   The session attribute "user" was originally stored by the attacker via
+     *   user registration. LoginValidator reads it back from the database and
+     *   stores it in the session. Messages.jsp then uses it in a SQL query.
+     *   If concatenated directly (as Statement + string concat), this enables
+     *   Second Order SQL Injection (CWE-89).
+     */
+    public void testMessagesJspImportsPreparedStatement() throws Exception {
+        java.io.File sourceFile = findJspFile("Messages.jsp");
+        assertNotNull("Messages.jsp source file must be locatable", sourceFile);
+
+        String sourceContent = readFile(sourceFile);
+
+        assertTrue(
+            "Messages.jsp must import java.sql.PreparedStatement",
+            sourceContent.contains("java.sql.PreparedStatement")
+        );
+
+        assertFalse(
+            "Messages.jsp must not import java.sql.Statement (replaced by PreparedStatement)",
+            sourceContent.contains("java.sql.Statement")
+        );
+    }
+
+    /**
+     * Verifies that Messages.jsp uses a parameterized query with a '?'
+     * placeholder for the recipient field derived from the session attribute.
+     */
+    public void testMessagesJspUsesParameterizedQuery() throws Exception {
+        java.io.File sourceFile = findJspFile("Messages.jsp");
+        assertNotNull("Messages.jsp source file must be locatable", sourceFile);
+
+        String sourceContent = readFile(sourceFile);
+
+        assertTrue(
+            "Messages.jsp must use PreparedStatement for the recipient query",
+            sourceContent.contains("PreparedStatement")
+        );
+
+        assertTrue(
+            "Messages.jsp SQL query must use '?' placeholder instead of string concatenation",
+            sourceContent.contains("recipient=?")
+        );
+
+        assertTrue(
+            "Messages.jsp must call setString() to bind the session-sourced recipient value",
+            sourceContent.contains("setString")
+        );
+    }
+
+    /**
+     * Verifies that Messages.jsp does NOT concatenate the session "user"
+     * attribute directly into the SQL query string — the classic Second Order
+     * SQL Injection pattern that this fix eliminates.
+     */
+    public void testMessagesJspDoesNotConcatenateSessionUserIntoQuery() throws Exception {
+        java.io.File sourceFile = findJspFile("Messages.jsp");
+        assertNotNull("Messages.jsp source file must be locatable", sourceFile);
+
+        String sourceContent = readFile(sourceFile);
+
+        // The vulnerable pattern: string concatenation of session attribute into SQL
+        assertFalse(
+            "Messages.jsp must not concatenate session 'user' attribute into SQL query string",
+            sourceContent.contains("recipient='\"") ||
+            sourceContent.contains("recipient='\"+") ||
+            sourceContent.contains("getAttribute(\"user\")+\"'")
+        );
+
+        assertFalse(
+            "Messages.jsp must not use createStatement() for the recipient query",
+            sourceContent.contains("createStatement()")
+        );
+    }
+
+    /**
+     * Verifies that a UNION-based Second Order SQL Injection payload stored as
+     * a username cannot exploit the Messages.jsp query.
+     *
+     * Attack scenario:
+     *   1. Attacker registers with username: x' UNION SELECT password,2,3,4,5 FROM users--
+     *   2. On login, LoginValidator reads that username from DB → stores in session
+     *   3. Messages.jsp executes: SELECT * FROM UserMessages WHERE recipient='<payload>'
+     *   With string concatenation the UNION executes; with PreparedStatement it is a literal.
+     */
+    public void testMessagesJspUnionBasedSecondOrderInjectionPayloadSafelyBound() throws Exception {
+        java.io.File sourceFile = findJspFile("Messages.jsp");
+        assertNotNull("Messages.jsp source file must be locatable", sourceFile);
+
+        String sourceContent = readFile(sourceFile);
+
+        // UNION attacks only succeed when the payload is concatenated into the query.
+        // PreparedStatement + setString treats the entire payload as a literal bind value.
+        assertFalse(
+            "Vulnerable concatenation pattern must not exist in Messages.jsp",
+            sourceContent.contains("+ session.getAttribute") ||
+            sourceContent.contains("getAttribute(\"user\") +") ||
+            sourceContent.contains("getAttribute(\"user\")+")
+        );
+
+        assertTrue(
+            "Safe PreparedStatement pattern must be present in Messages.jsp",
+            sourceContent.contains("prepareStatement") && sourceContent.contains("setString")
+        );
+    }
+
+    /**
+     * Verifies that a tautology-based Second Order SQL Injection payload
+     * (e.g., ' OR '1'='1) stored as a username cannot bypass the recipient
+     * filter in Messages.jsp.
+     */
+    public void testMessagesJspTautologySecondOrderInjectionPayloadSafelyBound() throws Exception {
+        java.io.File sourceFile = findJspFile("Messages.jsp");
+        assertNotNull("Messages.jsp source file must be locatable", sourceFile);
+
+        String sourceContent = readFile(sourceFile);
+
+        // Tautology attacks require string concatenation to alter query logic
+        assertFalse(
+            "Messages.jsp must not directly use session attribute value in SQL string",
+            sourceContent.contains("where recipient='\"+" )
+        );
+
+        assertTrue(
+            "Messages.jsp must use PreparedStatement with '?' placeholder",
+            sourceContent.contains("recipient=?")
+        );
+    }
+
+    // -------------------------------------------------------------------------
     // Helper methods
     // -------------------------------------------------------------------------
+
+    /**
+     * Locates a JSP file by name, searching standard Maven webapp directories
+     * relative to the current working directory.
+     */
+    private java.io.File findJspFile(String fileName) {
+        String[] searchPaths = {
+            "src/main/webapp/vulnerability/" + fileName,
+            "../src/main/webapp/vulnerability/" + fileName
+        };
+        for (String path : searchPaths) {
+            java.io.File f = new java.io.File(path);
+            if (f.exists()) {
+                return f;
+            }
+        }
+        return null;
+    }
 
     /**
      * Locates the source file by walking up from the test class
