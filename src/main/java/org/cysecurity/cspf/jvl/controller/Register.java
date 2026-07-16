@@ -9,9 +9,9 @@ package org.cysecurity.cspf.jvl.controller;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Statement;
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -54,9 +54,17 @@ public class Register extends HttpServlet {
                     if(con!=null && !con.isClosed())
                                {
                                   
-                                   Statement stmt = con.createStatement();  
-                                  stmt.executeUpdate("INSERT into users(username, password, email, About,avatar,privilege,secretquestion,secret) values ('"+user+"','"+pass+"','"+email+"','"+about+"','default.jpg','user',1,'"+secret+"')");
-                                       stmt.executeUpdate("INSERT into UserMessages(recipient, sender, subject, msg) values ('"+user+"','admin','Hi','Hi<br/> This is admin of this page. <br/> Welcome to Our Forum')");
+                                   // Use PreparedStatement to prevent SQL injection
+                                   PreparedStatement stmt = con.prepareStatement("INSERT into users(username, password, email, About,avatar,privilege,secretquestion,secret) values (?,?,?,?,'default.jpg','user',1,?)");
+                                   stmt.setString(1, user);
+                                   stmt.setString(2, pass);
+                                   stmt.setString(3, email);
+                                   stmt.setString(4, about);
+                                   stmt.setString(5, secret);
+                                   stmt.executeUpdate();
+                                   PreparedStatement msgStmt = con.prepareStatement("INSERT into UserMessages(recipient, sender, subject, msg) values (?,'admin','Hi','Hi<br/> This is admin of this page. <br/> Welcome to Our Forum')");
+                                   msgStmt.setString(1, user);
+                                   msgStmt.executeUpdate();
              
                                     response.sendRedirect("index.jsp");
                                     
