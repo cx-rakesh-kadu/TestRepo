@@ -1,5 +1,5 @@
 FROM ubuntu:17.10
-ENV WORKDIR /usr/src/app/
+ENV WORKDIR /usr/src/app/ 
 WORKDIR $WORKDIR
 COPY package*.json $WORKDIR
 RUN npm install --production --no-cache
